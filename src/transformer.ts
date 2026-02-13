@@ -1,103 +1,114 @@
-import type { PluggableList, Plugin } from "unified";
-import type { Root as MdastRoot } from "mdast";
-import type { Root as HastRoot, Element } from "hast";
-import type { VFile } from "vfile";
-import remarkGfm from "remark-gfm";
-import rehypeSlug from "rehype-slug";
-import { findAndReplace } from "mdast-util-find-and-replace";
-import { visit } from "unist-util-visit";
 import type { QuartzTransformerPlugin, BuildCtx } from "@quartz-community/types";
-import type { ExampleTransformerOptions } from "./types";
+import type { PluggableList } from "unified";
+import rehypeRaw from "rehype-raw";
 
-const defaultOptions: ExampleTransformerOptions = {
-  highlightToken: "==",
-  headingClass: "example-plugin-heading",
-  enableGfm: true,
-  addHeadingSlugs: true,
+export interface OxHugoOptions {
+  /** Replace {{ relref }} with quartz wikilinks []() */
+  wikilinks: boolean;
+  /** Remove pre-defined anchor (see https://ox-hugo.scripter.co/doc/anchors/) */
+  removePredefinedAnchor: boolean;
+  /** Remove hugo shortcode syntax */
+  removeHugoShortcode: boolean;
+  /** Replace <figure/> with ![]() */
+  replaceFigureWithMdImg: boolean;
+
+  /** Replace org latex fragments with $ and $$ */
+  replaceOrgLatex: boolean;
+}
+
+const defaultOptions: OxHugoOptions = {
+  wikilinks: true,
+  removePredefinedAnchor: true,
+  removeHugoShortcode: true,
+  replaceFigureWithMdImg: true,
+  replaceOrgLatex: true,
 };
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const remarkHighlightToken = (token: string): Plugin<[], MdastRoot> => {
-  const escapedToken = escapeRegExp(token);
-  const pattern = new RegExp(`${escapedToken}([^\n]+?)${escapedToken}`, "g");
-  return () => (tree: MdastRoot, _file: VFile) => {
-    findAndReplace(tree, [
-      [
-        pattern,
-        (_match: string, value: string) => ({
-          type: "strong",
-          children: [{ type: "text", value }],
-        }),
-      ],
-    ]);
-  };
-};
-
-const rehypeHeadingClass = (className: string): Plugin<[], HastRoot> => {
-  return () => (tree: HastRoot, _file: VFile) => {
-    visit(tree, "element", (node: Element) => {
-      if (!/^h[1-6]$/.test(node.tagName)) {
-        return;
-      }
-
-      const existing = node.properties?.className;
-      const classes: string[] = Array.isArray(existing)
-        ? existing.filter((value): value is string => typeof value === "string")
-        : typeof existing === "string"
-          ? [existing]
-          : [];
-      node.properties = {
-        ...node.properties,
-        className: [...classes, className],
-      };
-    });
-  };
-};
+const relrefRegex = new RegExp(/\[([^\]]+)\]\(\{\{< relref "([^"]+)" >\}\}\)/, "g");
+const predefinedHeadingIdRegex = new RegExp(/(.*) {#(?:.*)}/, "g");
+const hugoShortcodeRegex = new RegExp(/{{(.*)}}/, "g");
+const figureTagRegex = new RegExp(/< ?figure src="(.*)" ?>/, "g");
+// \\\\\( -> matches \\(
+// (.+?) -> Lazy match for capturing the equation
+// \\\\\) -> matches \\)
+const inlineLatexRegex = new RegExp(/\\\\\((.+?)\\\\\)/, "g");
+// (?:\\begin{equation}|\\\\\(|\\\\\[) -> start of equation
+// ([\s\S]*?) -> Matches the block equation
+// (?:\\\\\]|\\\\\)|\\end{equation}) -> end of equation
+const blockLatexRegex = new RegExp(
+  /(?:\\begin{equation}|\\\\\(|\\\\\[)([\s\S]*?)(?:\\\\\]|\\\\\)|\\end{equation})/,
+  "g",
+);
+// \$\$[\s\S]*?\$\$ -> Matches block equations
+// \$.*?\$ -> Matches inline equations
+const quartzLatexRegex = new RegExp(/\$\$[\s\S]*?\$\$|\$.*?\$/, "g");
 
 /**
- * Example transformer showing remark/rehype usage and resource injection.
- */
-export const ExampleTransformer: QuartzTransformerPlugin<Partial<ExampleTransformerOptions>> = (
-  userOptions?: Partial<ExampleTransformerOptions>,
+ * ox-hugo is an org exporter backend that exports org files to hugo-compatible
+ * markdown in an opinionated way. This plugin adds some tweaks to the generated
+ * markdown to make it compatible with quartz but the list of changes applied it
+ * is not exhaustive.
+ * */
+export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOptions>> = (
+  userOpts,
 ) => {
-  const options = { ...defaultOptions, ...userOptions };
+  const opts = { ...defaultOptions, ...userOpts };
   return {
-    name: "ExampleTransformer",
+    name: "OxHugoFlavouredMarkdown",
     textTransform(_ctx: BuildCtx, src: string) {
-      return src.endsWith("\n") ? src : `${src}\n`;
-    },
-    markdownPlugins(): PluggableList {
-      const plugins: PluggableList = [remarkHighlightToken(options.highlightToken)];
-      if (options.enableGfm) {
-        plugins.unshift(remarkGfm);
+      if (opts.wikilinks) {
+        src = src.toString();
+        src = src.replaceAll(relrefRegex, (_value, ...capture) => {
+          const [text, link] = capture;
+          return `[${text}](${link})`;
+        });
       }
-      return plugins;
-    },
-    htmlPlugins(): PluggableList {
-      const plugins: PluggableList = [rehypeHeadingClass(options.headingClass)];
-      if (options.addHeadingSlugs) {
-        plugins.unshift(rehypeSlug);
+
+      if (opts.removePredefinedAnchor) {
+        src = src.toString();
+        src = src.replaceAll(predefinedHeadingIdRegex, (_value, ...capture) => {
+          const [headingText] = capture;
+          return headingText;
+        });
       }
-      return plugins;
+
+      if (opts.removeHugoShortcode) {
+        src = src.toString();
+        src = src.replaceAll(hugoShortcodeRegex, (_value, ...capture) => {
+          const [scContent] = capture;
+          return scContent;
+        });
+      }
+
+      if (opts.replaceFigureWithMdImg) {
+        src = src.toString();
+        src = src.replaceAll(figureTagRegex, (_value, ...capture) => {
+          const [src] = capture;
+          return `![](${src})`;
+        });
+      }
+
+      if (opts.replaceOrgLatex) {
+        src = src.toString();
+        src = src.replaceAll(inlineLatexRegex, (_value, ...capture) => {
+          const [eqn] = capture;
+          return `$${eqn}$`;
+        });
+        src = src.replaceAll(blockLatexRegex, (_value, ...capture) => {
+          const [eqn] = capture;
+          return `$$${eqn}$$`;
+        });
+
+        // ox-hugo escapes _ as \_
+        src = src.replaceAll(quartzLatexRegex, (value) => {
+          return value.replaceAll("\\_", "_");
+        });
+      }
+      return src;
     },
-    externalResources() {
-      return {
-        css: [
-          {
-            content: `.${options.headingClass} { letter-spacing: 0.02em; }`,
-            inline: true,
-          },
-        ],
-        js: [
-          {
-            contentType: "inline",
-            loadTime: "afterDOMReady",
-            script: "document.documentElement.dataset.exampleTransformer = 'true'",
-          },
-        ],
-        additionalHead: [],
-      };
+    htmlPlugins() {
+      const plugins: PluggableList = [rehypeRaw];
+      return plugins;
     },
   };
 };
