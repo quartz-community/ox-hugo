@@ -78,5 +78,16 @@
   "engines": {
     "node": ">=22",
     "npm": ">=10.9.2"
+  },
+  "quartz": {
+    "name": "ox-hugo",
+    "displayName": "Ox-Hugo",
+    "category": "transformer",
+    "version": "1.0.0",
+    "quartzVersion": ">=5.0.0",
+    "dependencies": [],
+    "defaultOrder": 91,
+    "defaultEnabled": false,
+    "defaultOptions": {}
   }
 }
