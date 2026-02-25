@@ -10,32 +10,36 @@ npx quartz plugin add github:quartz-community/ox-hugo
 
 ## Usage
 
-```ts
-// quartz.config.ts
-import * as ExternalPlugin from "./.quartz/plugins"
+```yaml title="quartz.config.yaml"
+plugins:
+  - source: github:quartz-community/ox-hugo
+    enabled: true
+```
 
-const config: QuartzConfig = {
-  plugins: {
-    transformers: [
-      ExternalPlugin.OxHugoFlavouredMarkdown(),
-    ],
-  },
-}
+For advanced use cases, you can override in TypeScript:
+
+```ts title="quartz.ts (override)"
+import * as ExternalPlugin from "./.quartz/plugins";
+
+ExternalPlugin.OxHugoFlavouredMarkdown({
+  wikilinks: true,
+  removePredefinedAnchor: true,
+});
 ```
 
 ## Configuration
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| wikilinks | `boolean` | `true` | Whether to parse wikilinks. |
-| removePredefinedAnchor | `boolean` | `true` | Whether to remove predefined anchors. |
-| removeHugoShortcode | `boolean` | `true` | Whether to remove Hugo shortcodes. |
-| replaceFigureWithMdImg | `boolean` | `true` | Whether to replace figure tags with markdown images. |
-| replaceOrgLatex | `boolean` | `true` | Whether to replace org-mode LaTeX. |
+| Option                   | Type      | Default | Description                                          |
+| ------------------------ | --------- | ------- | ---------------------------------------------------- |
+| `wikilinks`              | `boolean` | `true`  | Whether to parse wikilinks.                          |
+| `removePredefinedAnchor` | `boolean` | `true`  | Whether to remove predefined anchors.                |
+| `removeHugoShortcode`    | `boolean` | `true`  | Whether to remove Hugo shortcodes.                   |
+| `replaceFigureWithMdImg` | `boolean` | `true`  | Whether to replace figure tags with markdown images. |
+| `replaceOrgLatex`        | `boolean` | `true`  | Whether to replace org-mode LaTeX.                   |
 
 ## Documentation
 
-See the [Quartz documentation](https://quartz.jzhao.xyz/) for more information.
+See the [Quartz documentation](https://quartz.jzhao.xyz/plugins/OxHugoFlavoredMarkdown) for more information.
 
 ## License
 
