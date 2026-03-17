@@ -45,9 +45,7 @@
   },
   "peerDependencies": {
     "@jackyzha0/quartz": "^4.5.2",
-    "preact": "^10.0.0",
-    "rehype-raw": "^7.0.0",
-    "unified": "^11.0.5"
+    "preact": "^10.0.0"
   },
   "peerDependenciesMeta": {
     "@jackyzha0/quartz": {
@@ -55,12 +53,6 @@
     },
     "preact": {
       "optional": false
-    },
-    "rehype-raw": {
-      "optional": true
-    },
-    "unified": {
-      "optional": true
     }
   },
   "dependencies": {
