@@ -5,7 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
   },
   format: ["esm"],
-  dts: true,
+  dts: { tsconfig: "tsconfig.build.json" },
   sourcemap: true,
   clean: true,
   treeshake: true,
