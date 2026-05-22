@@ -87,6 +87,29 @@
     "dependencies": [],
     "defaultOrder": 91,
     "defaultEnabled": false,
-    "defaultOptions": {}
+    "defaultOptions": {
+      "wikilinks": true,
+      "removePredefinedAnchor": true,
+      "removeHugoShortcode": true,
+      "replaceFigureWithMdImg": true,
+      "replaceOrgLatex": true
+    },
+    "optionSchema": {
+      "wikilinks": {
+        "type": "boolean"
+      },
+      "removePredefinedAnchor": {
+        "type": "boolean"
+      },
+      "removeHugoShortcode": {
+        "type": "boolean"
+      },
+      "replaceFigureWithMdImg": {
+        "type": "boolean"
+      },
+      "replaceOrgLatex": {
+        "type": "boolean"
+      }
+    }
   }
 }
