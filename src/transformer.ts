@@ -9,7 +9,7 @@ export interface OxHugoOptions {
   removePredefinedAnchor: boolean;
   /** Remove hugo shortcode syntax */
   removeHugoShortcode: boolean;
-  /** Replace <figure/> with ![]() */
+  /** Replace <figure/> shortcodes with <img> tags, preserving their attributes */
   replaceFigureWithMdImg: boolean;
 
   /** Replace org latex fragments with $ and $$ */
@@ -27,7 +27,7 @@ const defaultOptions: OxHugoOptions = {
 const relrefRegex = new RegExp(/\[([^\]]+)\]\(\{\{< relref "([^"]+)" >\}\}\)/, "g");
 const predefinedHeadingIdRegex = new RegExp(/(.*) {#(?:.*)}/, "g");
 const hugoShortcodeRegex = new RegExp(/{{(.*)}}/, "g");
-const figureTagRegex = new RegExp(/< ?figure src="(.*)" ?>/, "g");
+const figureTagRegex = new RegExp(/< ?figure ((?:[a-zA-Z0-9]+="(?:[^"\\]|\\.)*"\s*)+) ?>/g);
 // \\\\\( -> matches \\(
 // (.+?) -> Lazy match for capturing the equation
 // \\\\\) -> matches \\)
@@ -83,8 +83,12 @@ export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOpti
       if (opts.replaceFigureWithMdImg) {
         src = src.toString();
         src = src.replaceAll(figureTagRegex, (_value, ...capture) => {
-          const [src] = capture;
-          return `![](${src})`;
+          const [figureAttrs] = capture;
+          const caption = figureAttrs
+            .match(/caption="((?:[^"\\]|\\.)*)"/)?.[1]
+            ?.replaceAll('\\"', '"');
+          const img = `<img ${figureAttrs.replace(/caption="(?:[^"\\]|\\.)*"/, "").trim()}>`;
+          return caption ? `<figure>\n${img}\n<figcaption>${caption}</figcaption>\n</figure>` : img;
         });
       }
 
