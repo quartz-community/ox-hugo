@@ -99,10 +99,18 @@ export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOpti
           return `$$${eqn}$$`;
         });
 
-        // ox-hugo escapes _ as \_
-        src = src.replaceAll(quartzLatexRegex, (value) => {
-          return value.replaceAll("\\_", "_");
-        });
+        // ox-hugo escapes markdown special characters inside math
+        // (e.g. _ -> \_, * -> \*, [ -> \[, ] -> \], { -> \{, } -> \}),
+        // undo them inside $..$ / $$..$$ so KaTeX can parse.
+        src = src.replaceAll(quartzLatexRegex, (value) =>
+          value
+            .replaceAll("\\_", "_")
+            .replaceAll("\\*", "*")
+            .replaceAll("\\[", "[")
+            .replaceAll("\\]", "]")
+            .replaceAll("\\{", "{")
+            .replaceAll("\\}", "}"),
+        );
       }
       return src;
     },
