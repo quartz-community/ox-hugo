@@ -44,13 +44,13 @@ ExternalPlugin.OxHugoFlavouredMarkdown({
 
 ## Configuration
 
-| Option                   | Type      | Default | Description                                                                                       |
-| ------------------------ | --------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `wikilinks`              | `boolean` | `true`  | Convert Hugo `relref` links (`[text]({{< relref "page" >}})`) to Markdown links (`[text](page)`). |
-| `removePredefinedAnchor` | `boolean` | `true`  | Strip predefined anchors (`{#id}`) from headings.                                                 |
-| `removeHugoShortcode`    | `boolean` | `true`  | Remove Hugo shortcode syntax (`{{ … }}`), keeping its content.                                    |
-| `replaceFigureWithMdImg` | `boolean` | `true`  | Replace `<figure src="…">` tags with Markdown images (`![](…)`).                                  |
-| `replaceOrgLatex`        | `boolean` | `true`  | Convert org-mode LaTeX fragments to `$…$` (inline) and `$$…$$` (block).                           |
+| Option                   | Type      | Default | Description                                                                                                                           |
+| ------------------------ | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `wikilinks`              | `boolean` | `true`  | Convert Hugo `relref` links (`[text]({{< relref "page" >}})`) to Markdown links (`[text](page)`).                                     |
+| `removePredefinedAnchor` | `boolean` | `true`  | Strip predefined anchors (`{#id}`) from headings.                                                                                     |
+| `removeHugoShortcode`    | `boolean` | `true`  | Remove Hugo shortcode syntax (`{{ … }}`), keeping its content.                                                                        |
+| `replaceFigureWithMdImg` | `boolean` | `true`  | Replace figure shortcodes (`{{< figure src="…" caption="…" >}}`) with Markdown images (`![caption](…)`; `alt` wins over the caption). |
+| `replaceOrgLatex`        | `boolean` | `true`  | Convert org-mode LaTeX fragments to `$…$` (inline) and `$$…$$` (block).                                                               |
 
 ## Documentation
 

@@ -58,6 +58,58 @@ describe("OxHugoFlavouredMarkdown textTransform", () => {
     );
   });
 
+  it("converts a captioned figure, with the caption's text as the alt text", () => {
+    // what ox-hugo writes for `#+caption: A cat` above `[[file:/ox-hugo/cat.png]]`
+    expect(
+      run(
+        '{{< figure src="/ox-hugo/cat.png" caption="<span class=\\"figure-number\\">Figure 1: </span>A cat" >}}',
+      ),
+    ).toBe("![A cat](/ox-hugo/cat.png)");
+    expect(
+      run(
+        '{{< figure caption="<span class=\\"figure-number\\">Figure 2: </span>x > y" src="b.png" >}}',
+      ),
+    ).toBe("![x > y](b.png)");
+    expect(run('{{< figure src="c.png" alt="Alt" caption="Cap" title="T \\"q\\"" >}}')).toBe(
+      '![Alt](c.png "T \\"q\\"")',
+    );
+    expect(run('{{< figure src="my cat.png" caption="[1]" >}}')).toBe("![\\[1\\]](<my cat.png>)");
+  });
+
+  it("converts a figure with shortcode removal disabled", () => {
+    expect(run('{{< figure src="a.png" >}} {{x}}', { removeHugoShortcode: false })).toBe(
+      "![](a.png) {{x}}",
+    );
+  });
+
+  it("leaves a figure without src alone", () => {
+    expect(run('{{< figure caption="x" >}}')).toBe('< figure caption="x" >');
+  });
+
+  it("leaves indented code blocks alone", () => {
+    expect(run("Go:\n\n    <h1>{{ .Title }}</h1>\n\n    \\\\(x\\\\)\n\nafter {{x}}")).toBe(
+      "Go:\n\n    <h1>{{ .Title }}</h1>\n\n    \\\\(x\\\\)\n\nafter x",
+    );
+    expect(run("# Code\n\tuse {{x}}")).toBe("# Code\n\tuse {{x}}");
+  });
+
+  it("rewrites indented lines that are not code", () => {
+    // paragraph continuation
+    expect(run("para\n    {{x}}")).toBe("para\n    x");
+    // list item content
+    expect(run("- item\n\n    {{x}} more\n\n1. one\n    \\\\(y\\\\)")).toBe(
+      "- item\n\n    x more\n\n1. one\n    $y$",
+    );
+    // after the list ends, indented lines are code again
+    expect(run("- item\n\npara\n\n    {{x}}")).toBe("- item\n\npara\n\n    {{x}}");
+  });
+
+  it("keeps text that already contains the placeholder character", () => {
+    expect(run("a 7 b {{x}}")).toBe("a 7 b x");
+    expect(run("`0` and ")).toBe("`0` and ");
+    expect(run("```\n\n```\n{{y}}")).toBe("```\n\n```\ny");
+  });
+
   it("respects disabled options", () => {
     expect(run("## H {#h} {{x}}", { removePredefinedAnchor: false })).toBe("## H {#h} x");
   });
