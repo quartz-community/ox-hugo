@@ -54,7 +54,7 @@ ExternalPlugin.OxHugoFlavouredMarkdown({
 
 ## Documentation
 
-See the [Quartz documentation](https://quartz.jzhao.xyz/plugins/OxHugoFlavoredMarkdown) and [OxHugo compatibility](https://quartz.jzhao.xyz/features/OxHugo%20compatibility) for more information.
+See the [Quartz documentation](https://quartz.jzhao.xyz/plugins/OxHugoFlavoredMarkdown) and [OxHugo compatibility](https://quartz.jzhao.xyz/features/oxhugo-compatibility) for more information.
 
 ## License
 
