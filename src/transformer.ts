@@ -59,12 +59,13 @@ const fencedCodeRegex =
   /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[`~]*[ \t]*$|(?![\s\S]))/gm;
 // inline code spans (a backtick run closed by a run of the same length)
 const inlineCodeRegex = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
-const placeholderRegex = /\u0000(\d+)\u0000/g;
+// Private-use character as the placeholder delimiter: never in real content, and allowed by no-control-regex.
+const placeholderRegex = /\uE000(\d+)\uE000/g;
 
 /** Runs `transform` on `src` with fenced code blocks and inline code spans left untouched. */
 export function transformOutsideCode(src: string, transform: (text: string) => string): string {
   const code: string[] = [];
-  const hide = (match: string) => `\u0000${code.push(match) - 1}\u0000`;
+  const hide = (match: string) => `\uE000${code.push(match) - 1}\uE000`;
   const hidden = src.replaceAll(fencedCodeRegex, hide).replaceAll(inlineCodeRegex, hide);
   return transform(hidden).replaceAll(placeholderRegex, (_m, i: string) => code[Number(i)]!);
 }
