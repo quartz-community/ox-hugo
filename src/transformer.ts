@@ -25,9 +25,15 @@ const defaultOptions: OxHugoOptions = {
 };
 
 const relrefRegex = new RegExp(/\[([^\]]+)\]\(\{\{< relref "([^"]+)" >\}\}\)/, "g");
-const predefinedHeadingIdRegex = new RegExp(/(.*) {#(?:.*)}/, "g");
-const hugoShortcodeRegex = new RegExp(/{{(.*)}}/, "g");
-const figureTagRegex = new RegExp(/< ?figure src="(.*)" ?>/, "g");
+// Only ATX headings: `## Title {#custom-id}` -> `## Title`
+const predefinedHeadingIdRegex = new RegExp(
+  /^( {0,3}#{1,6}[ \t].*?)[ \t]+\{#[^}\n]*\}[ \t]*$/,
+  "gm",
+);
+// Lazy, so two shortcodes on one line stay two shortcodes
+const hugoShortcodeRegex = new RegExp(/{{(.*?)}}/, "g");
+// `{{< figure src="…" … >}}` (the `{{`/`}}` are already gone): take `src` alone, skip other params
+const figureTagRegex = new RegExp(/< ?figure\b[^>]*?\bsrc="([^"]*)"[^>]*>/, "g");
 // \\\\\( -> matches \\(
 // (.+?) -> Lazy match for capturing the equation
 // \\\\\) -> matches \\)
@@ -39,9 +45,44 @@ const blockLatexRegex = new RegExp(
   /(?:\\begin{equation}|\\\\\(|\\\\\[)([\s\S]*?)(?:\\\\\]|\\\\\)|\\end{equation})/,
   "g",
 );
-// \$\$[\s\S]*?\$\$ -> Matches block equations
-// \$.*?\$ -> Matches inline equations
-const quartzLatexRegex = new RegExp(/\$\$[\s\S]*?\$\$|\$.*?\$/, "g");
+// \$\$[\s\S]*?\$\$ -> block equations
+// inline equations, with pandoc's rule so that dollar amounts are left alone: the opening `$` is
+// not followed by whitespace, the closing `$` is not preceded by whitespace nor followed by a
+// digit, and both are on one line
+const quartzLatexRegex = new RegExp(
+  /\$\$[\s\S]*?\$\$|\$(?![\s$])(?:[^$\n\\]|\\[^\n])*?(?<![\s\\])\$(?!\d)/,
+  "g",
+);
+
+// fenced code blocks (``` or ~~~, closed by a fence of the same kind at least as long, or EOF)
+const fencedCodeRegex =
+  /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[`~]*[ \t]*$|(?![\s\S]))/gm;
+// inline code spans (a backtick run closed by a run of the same length)
+const inlineCodeRegex = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
+// Private-use character as the placeholder delimiter: never in real content, and allowed by no-control-regex.
+const placeholderRegex = /\uE000(\d+)\uE000/g;
+
+/** Runs `transform` on `src` with fenced code blocks and inline code spans left untouched. */
+export function transformOutsideCode(src: string, transform: (text: string) => string): string {
+  const code: string[] = [];
+  const hide = (match: string) => `\uE000${code.push(match) - 1}\uE000`;
+  const hidden = src.replaceAll(fencedCodeRegex, hide).replaceAll(inlineCodeRegex, hide);
+  return transform(hidden).replaceAll(placeholderRegex, (_m, i: string) => code[Number(i)]!);
+}
+
+/**
+ * Undoes ox-hugo's escaping of LaTeX fragments (`org-blackfriday-escape-chars-in-equation`, which
+ * protects them from Hugo's Markdown parser): `_`, `*` and `` ` `` get a backslash (`\_`), a
+ * backslash before ASCII punctuation gets another one (`\{` -> `\\{`, `\,` -> `\\,`,
+ * `\\` -> `\\\`), and `](` becomes `\]\(`. Quartz's math parser reads `$…$` raw, so KaTeX saw
+ * the escapes (`\_`, or `\\,` = line break + comma).
+ */
+export function unescapeOxHugoMath(math: string): string {
+  return math
+    .replaceAll("\\]\\(", "](")
+    .replace(/\\([_*`])/g, "$1")
+    .replace(/\\(\\[!-/:-@[-`{-~])/g, "$1");
+}
 
 /**
  * ox-hugo is an org exporter backend that exports org files to hugo-compatible
@@ -56,55 +97,51 @@ export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOpti
   return {
     name: "OxHugoFlavouredMarkdown",
     textTransform(_ctx: BuildCtx, src: string) {
-      if (opts.wikilinks) {
-        src = src.toString();
-        src = src.replaceAll(relrefRegex, (_value, ...capture) => {
-          const [text, link] = capture;
-          return `[${text}](${link})`;
-        });
-      }
+      // code blocks and inline code are shown verbatim, so none of the rewrites apply there
+      return transformOutsideCode(src.toString(), (src) => {
+        if (opts.wikilinks) {
+          src = src.replaceAll(relrefRegex, (_value, ...capture) => {
+            const [text, link] = capture;
+            return `[${text}](${link})`;
+          });
+        }
 
-      if (opts.removePredefinedAnchor) {
-        src = src.toString();
-        src = src.replaceAll(predefinedHeadingIdRegex, (_value, ...capture) => {
-          const [headingText] = capture;
-          return headingText;
-        });
-      }
+        if (opts.removePredefinedAnchor) {
+          src = src.replaceAll(predefinedHeadingIdRegex, (_value, ...capture) => {
+            const [headingText] = capture;
+            return headingText;
+          });
+        }
 
-      if (opts.removeHugoShortcode) {
-        src = src.toString();
-        src = src.replaceAll(hugoShortcodeRegex, (_value, ...capture) => {
-          const [scContent] = capture;
-          return scContent;
-        });
-      }
+        if (opts.removeHugoShortcode) {
+          src = src.replaceAll(hugoShortcodeRegex, (_value, ...capture) => {
+            const [scContent] = capture;
+            return scContent;
+          });
+        }
 
-      if (opts.replaceFigureWithMdImg) {
-        src = src.toString();
-        src = src.replaceAll(figureTagRegex, (_value, ...capture) => {
-          const [src] = capture;
-          return `![](${src})`;
-        });
-      }
+        if (opts.replaceFigureWithMdImg) {
+          src = src.replaceAll(figureTagRegex, (_value, ...capture) => {
+            const [imgSrc] = capture;
+            return `![](${imgSrc})`;
+          });
+        }
 
-      if (opts.replaceOrgLatex) {
-        src = src.toString();
-        src = src.replaceAll(inlineLatexRegex, (_value, ...capture) => {
-          const [eqn] = capture;
-          return `$${eqn}$`;
-        });
-        src = src.replaceAll(blockLatexRegex, (_value, ...capture) => {
-          const [eqn] = capture;
-          return `$$${eqn}$$`;
-        });
+        if (opts.replaceOrgLatex) {
+          src = src.replaceAll(inlineLatexRegex, (_value, ...capture) => {
+            const [eqn] = capture;
+            return `$${eqn}$`;
+          });
+          src = src.replaceAll(blockLatexRegex, (_value, ...capture) => {
+            const [eqn] = capture;
+            return `$$${eqn}$$`;
+          });
 
-        // ox-hugo escapes _ as \_
-        src = src.replaceAll(quartzLatexRegex, (value) => {
-          return value.replaceAll("\\_", "_");
-        });
-      }
-      return src;
+          // ox-hugo escapes Markdown characters inside math
+          src = src.replaceAll(quartzLatexRegex, (value) => unescapeOxHugoMath(value));
+        }
+        return src;
+      });
     },
     htmlPlugins() {
       const plugins: PluggableList = [rehypeRaw];
