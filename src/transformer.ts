@@ -150,9 +150,13 @@ function hideIndentedCode(src: string, hide: (code: string) => string): string {
 
 /**
  * Runs `transform` on `src` with fenced code blocks, indented code blocks and inline code spans
- * left untouched.
+ * left untouched. `transform` sees them as placeholders; it gets `restore` to turn the
+ * placeholders in a piece of its text back into the code they hide.
  */
-export function transformOutsideCode(src: string, transform: (text: string) => string): string {
+export function transformOutsideCode(
+  src: string,
+  transform: (text: string, restore: (text: string) => string) => string,
+): string {
   const code: string[] = [];
   const hide = (match: string) => `\uE000${code.push(match) - 1}\uE000`;
   const restore = (text: string): string =>
@@ -161,7 +165,7 @@ export function transformOutsideCode(src: string, transform: (text: string) => s
     src.replaceAll("\uE000", hide).replaceAll(fencedCodeRegex, hide),
     hide,
   ).replaceAll(inlineCodeRegex, hide);
-  return restore(transform(hidden));
+  return restore(transform(hidden, restore));
 }
 
 /**
@@ -192,7 +196,7 @@ export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOpti
     name: "OxHugoFlavouredMarkdown",
     textTransform(_ctx: BuildCtx, src: string) {
       // code blocks and inline code are shown verbatim, so none of the rewrites apply there
-      return transformOutsideCode(src.toString(), (src) => {
+      return transformOutsideCode(src.toString(), (src, restore) => {
         if (opts.wikilinks) {
           src = src.replaceAll(relrefRegex, (_value, ...capture) => {
             const [text, link] = capture;
@@ -207,11 +211,14 @@ export const OxHugoFlavouredMarkdown: QuartzTransformerPlugin<Partial<OxHugoOpti
           });
         }
 
-        // before the shortcodes go: a caption can contain `}}`
+        // before the shortcodes go: a caption can contain `}}`. A backtick-quoted parameter
+        // (src=`a b.png`) looks like inline code and is hidden as such, so the parameters get
+        // their code back before they are parsed
         if (opts.replaceFigureWithMdImg) {
           src = src.replaceAll(
             figureTagRegex,
-            (value, params: string) => figureToMarkdownImage(parseShortcodeParams(params)) ?? value,
+            (value, params: string) =>
+              figureToMarkdownImage(parseShortcodeParams(restore(params))) ?? value,
           );
         }
 
