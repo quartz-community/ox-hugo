@@ -110,8 +110,50 @@ describe("OxHugoFlavouredMarkdown textTransform", () => {
     expect(run("```\n\n```\n{{y}}")).toBe("```\n\n```\ny");
   });
 
-  it("respects disabled options", () => {
-    expect(run("## H {#h} {{x}}", { removePredefinedAnchor: false })).toBe("## H {#h} x");
+  it("keeps a predefined anchor when removePredefinedAnchor is off", () => {
+    expect(run("## H {#h}", { removePredefinedAnchor: false })).toBe("## H {#h}");
+    expect(run("## H {#h}")).toBe("## H");
+  });
+
+  it("keeps relrefs, figures and LaTeX when every option is off", () => {
+    const src = '[P]({{< relref "p.md" >}}) {{< figure src="a.png" >}} \\\\(x\\\\) \\\\[y\\\\]';
+    const off = {
+      wikilinks: false,
+      removePredefinedAnchor: false,
+      removeHugoShortcode: false,
+      replaceFigureWithMdImg: false,
+      replaceOrgLatex: false,
+    };
+    expect(run(src, off)).toBe(src);
+  });
+
+  it("restores placeholders with two-digit indices", () => {
+    const code = "`a` ".repeat(11);
+    expect(run(code + "{{x}}")).toBe(code + "x");
+  });
+
+  it("converts org block LaTeX to $$", () => {
+    expect(run("x \\\\[a\\_b\\\\] y")).toBe("x $$a_b$$ y");
+    expect(run("\\begin{equation}a\\_b\\end{equation}")).toBe("$$a_b$$");
+  });
+
+  it("converts figures with bare and backtick-quoted parameters", () => {
+    expect(run("{{< figure src=a.png >}}")).toBe("![](a.png)");
+    expect(run("{{< figure src=a.png alt=Cat >}}")).toBe("![Cat](a.png)");
+    expect(run("{{< figure src=`a b.png` >}}")).toBe("![](<a b.png>)");
+    expect(run("{{< figure src=`a.png` caption=`A <b>cat</b>` >}}")).toBe("![A cat](a.png)");
+    // inline code outside the shortcode stays as it is
+    expect(run("`{{x}}` and {{< figure src=`c d.png` >}} `$a\\_b$`")).toBe(
+      "`{{x}}` and ![](<c d.png>) `$a\\_b$`",
+    );
+  });
+
+  it("collapses the tags and whitespace of a caption", () => {
+    expect(run('{{< figure src="a.png" caption="<em>A</em>   cat" >}}')).toBe("![A cat](a.png)");
+  });
+
+  it("keeps indented code lines that follow an indented code line", () => {
+    expect(run("para\n\n    line1\n    {{x}}")).toBe("para\n\n    line1\n    {{x}}");
   });
 });
 
