@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+### Patch Changes
+
+- e7a3519: Convert figure shortcodes with backtick-quoted parameters (``{{< figure src=`a b.png` >}}``) to images (`![](<a b.png>)`); they were hidden as inline code and came out as ``![](`a b.png`)``.
+
 ## 1.0.3
 
 ### Patch Changes
